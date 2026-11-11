@@ -1,0 +1,26 @@
+{
+  "source": "NOAA CO-OPS",
+  "station_id": "9451600",
+  "station_name": "Sitka",
+  "state": "AK",
+  "timezone": "gmt",
+  "units": "metric",
+  "datum": "MLLW",
+  "prediction_interval_minutes": 6,
+  "products": {
+    "observations": "water_level",
+    "predictions": "predictions"
+  },
+  "observation_interval_minutes": 6,
+  "seed_start_date": "2020-01-01",
+  "ingestion": {
+    "platform": "GitHub Actions",
+    "repository_visibility": "public",
+    "cadence": "hourly"
+  },
+  "storage": {
+    "platform": "BigQuery",
+    "edition": "Sandbox",
+    "status": "preferred"
+  }
+}
