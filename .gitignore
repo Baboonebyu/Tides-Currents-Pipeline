@@ -1,0 +1,28 @@
+# Local credentials and environment configuration
+.env
+.env.*
+!.env.example
+secrets/
+*.secret
+*.secrets
+
+# Python and local development artifacts
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.log
+
+# Data files (keep downloaded seeds out of Git)
+data/
+*.csv
+*.csv.gz
+*.parquet
+*.jsonl
+*.ndjson
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
