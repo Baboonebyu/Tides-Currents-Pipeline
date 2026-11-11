@@ -5,6 +5,7 @@
 secrets/
 *.secret
 *.secrets
+/conversation_log.md
 
 # Python and local development artifacts
 __pycache__/

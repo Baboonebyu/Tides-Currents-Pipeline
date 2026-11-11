@@ -21,6 +21,7 @@
   "storage": {
     "platform": "BigQuery",
     "edition": "Sandbox",
+    "dataset_id": "noaa_coops",
     "status": "preferred"
   }
 }

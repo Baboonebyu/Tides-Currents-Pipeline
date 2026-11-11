@@ -1,5 +1,7 @@
 # Sitka Water Levels Pipeline
 
+Create for BYU 452 as a choose your own project assignment. I picked the pipeline assignment. Created with Codex
+
 An automated data pipeline for NOAA CO-OPS water-level observations and tide predictions at Sitka, Alaska.
 
 ## Source
@@ -24,13 +26,41 @@ GitHub Actions will run the recurring NOAA collector once per hour. Runs will re
 
 ## Preferred analytical store: BigQuery Sandbox
 
-BigQuery Sandbox is the current storage choice to evaluate. It is no-cost and requires no credit card, with a 10 GiB lifetime storage limit and 1 TiB of query processing per month. Sandbox tables expire after 60 days by default. Sandbox does not support streaming inserts or DML, so ingestion should use batch loads and analytics should deduplicate overlapping rows in a view (for example, using `ROW_NUMBER()` by station and observation timestamp). These limits are suitable for the assignment's one-week follow-up, but the table lifetime needs attention if the project runs longer.
+BigQuery Sandbox is the current storage choice to evaluate. The planned dataset is `noaa_coops`, named for the NOAA CO-OPS source so it can contain multiple stations. It is no-cost and requires no credit card, with a 10 GiB lifetime storage limit and 1 TiB of query processing per month. Sandbox tables expire after 60 days by default. Sandbox does not support streaming inserts or DML, so ingestion should use batch loads and analytics should deduplicate overlapping rows in a view (for example, using `ROW_NUMBER()` by station and observation timestamp). These limits are suitable for the assignment's one-week follow-up, but the table lifetime needs attention if the project runs longer.
 
 For GitHub Actions authentication, prefer Google Cloud Workload Identity Federation (GitHub OIDC) over a long-lived service-account key. This avoids storing a Google credential as a GitHub secret.
 
 ## Historical seed
 
 Seed both observed water levels and tide predictions beginning **2020-01-01**. Save each downloaded raw response locally under `data/raw/` and bulk-load from those saved files. The NOAA API limits 6-minute water-level requests to one month, so the observation seed must be fetched in monthly chunks; align and deduplicate the two products by station and timestamp for residual analysis.
+
+Run the downloader from the repository root with Python:
+
+```powershell
+python scripts/seed_noaa.py
+```
+
+The end date defaults to today in UTC. You can set a fixed end date with `--end-date YYYY-MM-DD`. The script stores one raw JSON response per product and month under `data/raw/noaa/9451600/`, writes a manifest with request metadata and row counts, retries temporary failures, and skips valid chunks already on disk. The data directory is ignored by Git.
+
+After the seed finishes downloading, normalize its files for BigQuery with:
+
+```powershell
+python scripts/clean_noaa.py
+```
+
+The cleaner writes one newline-delimited JSON file per raw chunk under `data/processed/noaa/9451600/`. It converts NOAA timestamps to explicit UTC timestamps, standardizes the water level in meters, and preserves station, datum, product, uncertainty, and quality/flag fields. Rows without a usable timestamp or numeric value are skipped and counted.
+
+Install the BigQuery client library and load the cleaned seed into the existing `noaa_coops` dataset with:
+
+```powershell
+pip install -r requirements.txt
+gcloud auth application-default login
+python scripts/load_bigquery.py --project-id YOUR_PROJECT_ID
+```
+
+Replace `YOUR_PROJECT_ID` with the ID of the `tides-pipeline` project. The loader uses your local Google Application Default Credentials, submits one batch load job, and writes to `water_level_seed`. A successful seed load replaces that seed table, making a rerun safe from duplicate seed rows. The later scheduled feed will go to a separate table.
+
+Run [`sql/seed_views.sql`](sql/seed_views.sql) in BigQuery Studio to create a deduplicated seed view and a residual view that joins observations and predictions at matching timestamps. These views cover the historical seed; they can be extended to include a separate live-ingestion table after it is created.
 
 ## Configuration
 
