@@ -18,15 +18,15 @@ The station offers both water-level measurements and NOAA tide predictions, so t
 
 ## Project status
 
-The source, station, scheduled compute, data store, and historical start date are selected. Historical observations and tide predictions beginning January 1, 2020 were loaded into BigQuery. The repository is intended to be public so standard GitHub-hosted Actions runs are free. The live workflow is configured for GitHub Actions and BigQuery Sandbox; the WIF provider, service-account binding, and repository variables must be in place before its first successful run.
+The historical seed is loaded, the Workload Identity Federation connection is configured, and a live batch has been queried from BigQuery. The repository is intended to be public so standard GitHub-hosted Actions runs are free. GitHub Actions is scheduled to continue the live load every 15 minutes.
 
 ## Ingestion plan
 
-GitHub Actions runs the NOAA collector every 30 minutes. Each run requests the previous hour of observations and predictions, providing overlap if a run is delayed or fails briefly. The collector retries temporary NOAA errors. The workflow writes failures to its run log and exits unsuccessfully so they are visible in Actions.
+GitHub Actions runs the NOAA collector every 15 minutes. Before fetching, the collector reads the latest saved event timestamp for each product from the union of `water_level_seed` and `water_level_live`. It requests data from that timestamp minus a one-hour overlap through the current time. This saved watermark means a failed or delayed run does not advance the checkpoint: after NOAA recovers, the next successful run fetches the missing interval automatically. The same process closes the seed-to-live gap.
 
-Each successful run batch-appends normalized rows to `water_level_live`, with an `ingested_at` timestamp. Overlapping records are expected; `sql/live_views.sql` combines this table with the historical seed and keeps the latest ingested copy for each station, product, and observation timestamp. The pipeline uses BigQuery load jobs, not streaming inserts or DML.
+The collector retries temporary NOAA errors and splits catch-up ranges into requests of at most 30 days, within NOAA's 31-day water-level request limit. If a run still fails, Actions records a failed run and the next scheduled run retries from the last data timestamp in BigQuery. Empty API responses don't move that product's watermark, so the same range is checked again on the next run.
 
-The one-hour lookback recovers a short interruption. A longer outage can leave a gap and needs a historical backfill; GitHub Actions can also delay scheduled starts during busy periods. The workflow can be started manually from the Actions tab to collect the current one-hour window.
+Each successful run batch-appends normalized rows to `water_level_live`, with an `ingested_at` timestamp. Overlapping records are expected; `sql/live_views.sql` combines this table with the historical seed and keeps the latest ingested copy for each station, product, and observation timestamp. The pipeline uses BigQuery load jobs, not streaming inserts or DML. A manual workflow run uses the same watermark logic as a scheduled run.
 
 ## Preferred analytical store: BigQuery Sandbox
 
@@ -68,7 +68,7 @@ Run [`sql/seed_views.sql`](sql/seed_views.sql) in BigQuery Studio for seed-only 
 
 ## Live workflow setup
 
-The `.github/workflows/noaa-live.yml` workflow uses Workload Identity Federation through the `github-actions-bq` service account. Configure the provider to trust only `Baboonebyu/Tides-Currents-Pipeline` on `master`, bind that GitHub identity to the service account with `roles/iam.workloadIdentityUser`, and grant the service account `roles/bigquery.jobUser` on the project plus `roles/bigquery.dataEditor` on the `noaa_coops` dataset.
+The `.github/workflows/noaa-live.yml` workflow uses Workload Identity Federation through the `github-actions-bq` service account. The provider maps `attribute.repository=assertion.repository` and `attribute.ref=assertion.ref`, and its condition allows only `Baboonebyu/Tides-Currents-Pipeline` on `master`. The service account grants `roles/iam.workloadIdentityUser` to the principal set for that repository attribute. It also needs `roles/bigquery.jobUser` on the project and `roles/bigquery.dataEditor` on the `noaa_coops` dataset.
 
 Add these nonsecret identifiers under the repository's **Settings → Secrets and variables → Actions → Variables**:
 
@@ -81,11 +81,11 @@ Add these nonsecret identifiers under the repository's **Settings → Secrets an
 To run the live collector locally, authenticate with Application Default Credentials and run:
 
 ```powershell
-python scripts/ingest_noaa_live.py
+python scripts/ingest_noaa_live.py --project-id tides-pipeline
 python scripts/load_bigquery_live.py --project-id tides-pipeline
 ```
 
-The collector writes to ignored `data/live/`. The loader appends that JSONL batch to `tides-pipeline.noaa_coops.water_level_live` with a deterministic BigQuery load job ID.
+The collector reads the product watermarks from BigQuery, fetches from those timestamps with a one-hour overlap, and writes to ignored `data/live/`. The loader appends that JSONL batch to `tides-pipeline.noaa_coops.water_level_live` with a deterministic BigQuery load job ID. A full day of API downtime is backfilled on the next successful run, with repeats removed from the analytical view.
 
 ## Configuration
 

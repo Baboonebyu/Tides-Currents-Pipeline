@@ -2,7 +2,7 @@ name: NOAA live ingestion
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -37,8 +37,8 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.WIF_SERVICE_ACCOUNT }}
 
-      - name: Fetch the previous hour of NOAA data
-        run: python scripts/ingest_noaa_live.py
+      - name: Catch up from the saved NOAA watermarks
+        run: python scripts/ingest_noaa_live.py --project-id "${{ vars.GCP_PROJECT_ID }}"
 
       - name: Append the live batch to BigQuery
         run: python scripts/load_bigquery_live.py --project-id "${{ vars.GCP_PROJECT_ID }}"

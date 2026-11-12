@@ -16,8 +16,8 @@
   "ingestion": {
     "platform": "GitHub Actions",
     "repository_visibility": "public",
-    "cadence": "every 30 minutes",
-    "lookback_hours": 1
+    "cadence": "every 15 minutes",
+    "overlap_hours": 1
   },
   "storage": {
     "platform": "BigQuery",
