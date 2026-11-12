@@ -16,12 +16,14 @@
   "ingestion": {
     "platform": "GitHub Actions",
     "repository_visibility": "public",
-    "cadence": "hourly"
+    "cadence": "every 30 minutes",
+    "lookback_hours": 1
   },
   "storage": {
     "platform": "BigQuery",
     "edition": "Sandbox",
     "dataset_id": "noaa_coops",
+    "live_table_id": "water_level_live",
     "status": "preferred"
   }
 }
