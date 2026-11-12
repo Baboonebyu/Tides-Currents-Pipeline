@@ -1,6 +1,6 @@
 # Sitka Water Levels Pipeline
 
-Create for BYU 452 as a choose your own project assignment. I picked the pipeline assignment. Created with Codex
+Create for BYU 452 as a choose your own project assignment. I picked the pipeline assignment. Created with Codex. This was to learn how pipelines work
 
 An automated data pipeline for NOAA CO-OPS water-level observations and tide predictions at Sitka, Alaska.
 
